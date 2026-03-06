@@ -1,6 +1,6 @@
-import { type UpdateInfo } from '@lobechat/electron-client-ipc';
+import { type UpdateInfo, type UpdaterState } from '@lobechat/electron-client-ipc';
 import { useWatchBroadcast } from '@lobechat/electron-client-ipc';
-import { Button, Flexbox, Icon } from '@lobehub/ui';
+import { Button, Flexbox, Icon, Markdown } from '@lobehub/ui';
 import { Modal } from 'antd';
 import { createStaticStyles, cssVar } from 'antd-style';
 import { CircleFadingArrowUp } from 'lucide-react';
@@ -39,6 +39,13 @@ export const UpdateNotification: React.FC = () => {
   const [detailVisible, setDetailVisible] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
 
+  useWatchBroadcast('updaterStateChanged', (state: UpdaterState) => {
+    if (state.stage !== 'available') return;
+    setUpdateAvailable(true);
+    setUpdateDownloaded(false);
+    if (state.updateInfo) setUpdateInfo(state.updateInfo);
+  });
+
   useWatchBroadcast('updateDownloaded', (info: UpdateInfo) => {
     setUpdateInfo(info);
     setUpdateDownloaded(true);
@@ -55,6 +62,44 @@ export const UpdateNotification: React.FC = () => {
 
   // 没有更新或正在下载时不显示任何内容
   if (!updateDownloaded && !updateAvailable) return null;
+
+  // 仅用于模拟发现更新
+  if (import.meta.env.DEV && updateAvailable && !updateDownloaded)
+    return (
+      <Modal
+        open
+        footer={null}
+        title={t('updater.newVersionAvailable')}
+        width={520}
+        onCancel={() => setUpdateAvailable(false)}
+      >
+        <Flexbox gap={12} style={{ maxWidth: 480 }}>
+          <div style={{ color: cssVar.colorTextSecondary, fontSize: 13 }}>
+            {t('updater.newVersionAvailableDesc', { version: updateInfo?.version })}
+          </div>
+          {typeof updateInfo?.releaseNotes === 'string' && (
+            <div className={styles.releaseNote}>
+              <Markdown>{updateInfo.releaseNotes}</Markdown>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Button size="small" onClick={() => setUpdateAvailable(false)}>
+              {t('updater.later')}
+            </Button>
+            <Button
+              size="small"
+              type="primary"
+              onClick={() => {
+                setUpdateAvailable(false);
+                autoUpdateService.downloadUpdate();
+              }}
+            >
+              {t('updater.downloadNewVersion')}
+            </Button>
+          </div>
+        </Flexbox>
+      </Modal>
+    );
 
   if (installConfirmMode === 'installLater') {
     return (
@@ -134,11 +179,10 @@ export const UpdateNotification: React.FC = () => {
             <div style={{ color: cssVar.colorTextSecondary, fontSize: 12 }}>
               {updateInfo?.version}
             </div>
-            {updateInfo?.releaseNotes && (
-              <div
-                className={styles.releaseNote}
-                dangerouslySetInnerHTML={{ __html: updateInfo.releaseNotes }}
-              />
+            {typeof updateInfo?.releaseNotes === 'string' && (
+              <div className={styles.releaseNote}>
+                <Markdown>{updateInfo.releaseNotes}</Markdown>
+              </div>
             )}
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <Button size="small" onClick={() => autoUpdateService.installLater()}>

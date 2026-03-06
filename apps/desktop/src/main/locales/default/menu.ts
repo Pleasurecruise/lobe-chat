@@ -29,6 +29,7 @@ const menu = {
   'dev.refreshMenu': 'Refresh Menu',
   'dev.reload': 'Reload',
   'dev.simulateAutoDownload': 'Simulate Auto Download (3s)',
+  'dev.simulateUpdateFound': 'Simulate Update Found',
   'dev.simulateDownloadComplete': 'Simulate Download Complete',
   'dev.simulateDownloadProgress': 'Simulate Download Progress',
   'dev.title': 'Development',

@@ -361,6 +361,12 @@ export class MacOSMenu extends BaseMenuPlatform implements IMenuPlatform {
             submenu: [
               {
                 click: () => {
+                  this.app.updaterManager.simulateUpdateFound();
+                },
+                label: t('dev.simulateUpdateFound'),
+              },
+              {
+                click: () => {
                   this.app.updaterManager.simulateUpdateAvailable();
                 },
                 label: t('dev.simulateAutoDownload'),
