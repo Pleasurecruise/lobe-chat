@@ -1,4 +1,4 @@
-import { type UpdateInfo, type UpdaterState } from '@lobechat/electron-client-ipc';
+import { type UpdateInfo } from '@lobechat/electron-client-ipc';
 import { useWatchBroadcast } from '@lobechat/electron-client-ipc';
 import { Button, Flexbox, Icon, Markdown } from '@lobehub/ui';
 import { Modal } from 'antd';
@@ -28,10 +28,17 @@ const styles = createStaticStyles(({ css, cssVar }) => ({
   `,
 }));
 
+const normalizeReleaseNotes = (notes: UpdateInfo['releaseNotes']): string | null => {
+  if (!notes) return null;
+  if (typeof notes === 'string') return notes;
+  const items = notes.filter((n) => n.note);
+  if (items.length === 0) return null;
+  return items.map((n) => `### ${n.version}\n\n${n.note}`).join('\n\n');
+};
+
 export const UpdateNotification: React.FC = () => {
   const { t } = useTranslation('electron');
-  const [updateAvailable, setUpdateAvailable] = useState(false);
-  const [updateDownloaded, setUpdateDownloaded] = useState(false);
+  const [updateStage, setUpdateStage] = useState<'available' | 'downloaded' | null>(null);
   const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
   const [installConfirmMode, setInstallConfirmMode] = useState<
     'unconfirm' | 'installLater' | 'installNow' | null
@@ -39,17 +46,15 @@ export const UpdateNotification: React.FC = () => {
   const [detailVisible, setDetailVisible] = useState(false);
   const [isInstalling, setIsInstalling] = useState(false);
 
-  useWatchBroadcast('updaterStateChanged', (state: UpdaterState) => {
+  useWatchBroadcast('updaterStateChanged', (state) => {
     if (state.stage !== 'available') return;
-    setUpdateAvailable(true);
-    setUpdateDownloaded(false);
+    setUpdateStage('available');
     if (state.updateInfo) setUpdateInfo(state.updateInfo);
   });
 
-  useWatchBroadcast('updateDownloaded', (info: UpdateInfo) => {
+  useWatchBroadcast('updateDownloaded', (info) => {
     setUpdateInfo(info);
-    setUpdateDownloaded(true);
-    setUpdateAvailable(false);
+    setUpdateStage('downloaded');
     setInstallConfirmMode('unconfirm');
     setDetailVisible(false);
   });
@@ -60,37 +65,39 @@ export const UpdateNotification: React.FC = () => {
     setTimeout(() => setInstallConfirmMode(null), 5000); // 5秒后自动隐藏提示
   });
 
-  // 没有更新或正在下载时不显示任何内容
-  if (!updateDownloaded && !updateAvailable) return null;
+  const releaseNotes = normalizeReleaseNotes(updateInfo?.releaseNotes);
 
-  // 仅用于模拟发现更新
-  if (import.meta.env.DEV && updateAvailable && !updateDownloaded)
+  // 没有更新或正在下载时不显示任何内容
+  if (!updateStage) return null;
+
+  // 仅用于模拟发现更新（DEV only）
+  if (import.meta.env.DEV && updateStage === 'available')
     return (
       <Modal
         open
         footer={null}
         title={t('updater.newVersionAvailable')}
         width={520}
-        onCancel={() => setUpdateAvailable(false)}
+        onCancel={() => setUpdateStage(null)}
       >
         <Flexbox gap={12} style={{ maxWidth: 480 }}>
           <div style={{ color: cssVar.colorTextSecondary, fontSize: 13 }}>
             {t('updater.newVersionAvailableDesc', { version: updateInfo?.version })}
           </div>
-          {typeof updateInfo?.releaseNotes === 'string' && (
+          {releaseNotes && (
             <div className={styles.releaseNote}>
-              <Markdown>{updateInfo.releaseNotes}</Markdown>
+              <Markdown>{releaseNotes}</Markdown>
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <Button size="small" onClick={() => setUpdateAvailable(false)}>
+            <Button size="small" onClick={() => setUpdateStage(null)}>
               {t('updater.later')}
             </Button>
             <Button
               size="small"
               type="primary"
               onClick={() => {
-                setUpdateAvailable(false);
+                setUpdateStage(null);
                 autoUpdateService.downloadUpdate();
               }}
             >
